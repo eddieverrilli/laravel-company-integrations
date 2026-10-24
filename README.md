@@ -1,58 +1,79 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Company integrations
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A small Laravel 13 app I built as a public code sample. Companies have users and integrations, and each integration holds a third-party API key. It covers what a multi-tenant app needs, in miniature: encrypted credentials, company-scoped queries and policies, a migration written for a table that already holds rows, htmx forms, and tests for all of it.
 
-## About Laravel
+It was built the way I work tickets: Claude Code, a branch per change, and a pull request with a review checklist. The [pull requests](../../pulls?q=is%3Apr) are the best way to read it. Each one explains what it changes and why.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## What it shows
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| Requirement | How |
+|---|---|
+| **Companies and users** | Every user belongs to one company. [`LoginController`](app/Http/Controllers/LoginController.php) is a plain session login, throttled to five attempts a minute. |
+| **A third-party API key** | [`Integration`](app/Models/Integration.php) stores it with the `encrypted` cast and hides it with `#[Hidden]` (Laravel 13's attribute form of `$hidden`). Pages only show the last four. Saving makes one test call to the provider first ([`AcceptedByProvider`](app/Rules/AcceptedByProvider.php)), which the tests fake with `Http::fake`. |
+| **Company scoping and policies** | [`BelongsToCompany`](app/Models/Concerns/BelongsToCompany.php) adds a global scope and fills in `company_id` on create. `Company` and `Integration` each have a policy that answers another company with a 404. The company and integration controllers call `Gate::authorize` before they validate anything, and the nested routes use `Route::scopeBindings()`. |
+| **A migration for a table with rows** | [`add_api_key_last_four_to_integrations_table`](database/migrations/2026_10_24_143830_add_api_key_last_four_to_integrations_table.php) adds a nullable column and backfills it 100 rows at a time with `chunkById`. |
+| **Blade, Alpine.js, htmx** | The [integration form](resources/views/integrations/form.blade.php) posts through htmx. A validation error returns just the form (a Blade `@fragment`) with a 422, which htmx swaps in, and success returns `HX-Redirect`. Alpine adds the key field only when you choose to replace a saved key. Tailwind is built by Vite. |
+| **PHPUnit feature tests** | Class-based tests in [`tests/Feature`](tests/Feature): happy paths, validation, a cross-company 404 for every route, the key never in HTML or JSON, and the backfill. |
+| **CI** | [GitHub Actions](.github/workflows/tests.yml) runs Pint, the Vite build and PHPUnit against MySQL 8.4 on every pull request. |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### Changing an ID in the URL
 
-## Learning Laravel
+A request for another company's record meets three separate checks:
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+1. `{integration}` is resolved through `{company}`, so an integration from a different company is a 404.
+2. The global scope hides other companies' integrations from every query, route binding included.
+3. The policies answer another company with `denyAsNotFound()`, so the response never confirms the record exists. They run before validation, so an outsider can't trigger the provider call either.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+[`CompanyIsolationTest`](tests/Feature/CompanyIsolationTest.php) sends every route as a guest and as a user from another company, puts another company's integration under your own company's URL, and checks the policies with the scope out of the way.
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+### Keeping the key secret
 
-## Agentic Development
+- Encrypted at rest, so a database dump only shows ciphertext.
+- Left out of `toArray()` and `toJson()`.
+- Never rendered: pages show `•••• 1234`, and the key field comes back empty after a failed save.
+- Never flashed: `api_key` is in `dontFlash`, so a redirect back with input can't write it to the session.
+- Sent to the provider in the `Authorization` header, not the query string.
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Run it
+
+You need PHP 8.3+, Composer and Node 22+.
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+composer setup        # install, .env, app key, migrations, npm install, Vite build
+php artisan db:seed   # two companies, three users, three integrations
+php artisan serve
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Log in as `ada@acme.test` with the password `password`. The other company's page is `/companies/2`, and it's a 404 for Ada.
 
-## Contributing
+Saving an integration checks the key against `ADS_API_URL`. To try the form without a real provider, run the bundled fake and set `ADS_API_URL=http://127.0.0.1:8099` in `.env`. It accepts any key that doesn't start with `bad`.
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+php -S 127.0.0.1:8099 scripts/fake-ads-api.php
+```
 
-## Code of Conduct
+Run the tests with `php artisan test`. They use in-memory SQLite by default. CI runs them against MySQL, and you can too by setting `DB_CONNECTION=mysql` and the other `DB_*` variables in your shell first.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## How the AI output was reviewed
 
-## Security Vulnerabilities
+Claude Code wrote the first draft of each branch from a ticket-sized brief and the rules in [CLAUDE.md](CLAUDE.md). I reviewed every line of each pull request before merging it, using the checklist in the [PR template](.github/pull_request_template.md). Passing tests are where the review starts. It also checks:
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- **Scope.** Every query on company data is scoped, and every new route has a cross-company test.
+- **Order.** Authorization comes before validation, so an outsider can't cause side effects.
+- **Secrets.** Nothing renders, serializes, logs, flashes or URL-encodes a key.
+- **Live data.** Migrations work on tables that already hold rows, and `down()` works.
+- **APIs.** Anything unfamiliar is checked against `vendor/` or the docs, because AI drafts sometimes call methods that don't exist.
+- **Tests that can fail.** Each test should break when the code is wrong. Swapping `chunkById()` for `chunk()` makes the backfill test fail, which is how that test was checked.
 
-## License
+Problems the process caught while building, before review:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- The provider tests matched `ADS_API_URL` from `.env`, so they passed in CI but failed on a machine pointed at the local fake. `phpunit.xml` now pins it.
+- The seeder used `WithoutModelEvents`, which would have skipped the hook that sets the last four, leaving seeded rows with `••••` and nothing after it.
+- After a rejected replacement key, Cancel hid the key field but left its error on screen. It was found by clicking through in a browser, and the error now sits inside the Alpine template with the field.
+- Following this README in a fresh clone left `package-lock.json` modified, because npm names the lockfile after the folder when `package.json` has no name. It has one now.
+
+## Left out on purpose
+
+- Deleting integrations, roles within a company, and OAuth2 integrations with token refresh.
+- On a very large table I'd run the backfill as a queued job instead of inside the deploy, then make the column `NOT NULL` in a later migration.
+- Rotating `APP_KEY`: Laravel also decrypts with the keys in `APP_PREVIOUS_KEYS`, so a rotation doesn't break saved API keys.
