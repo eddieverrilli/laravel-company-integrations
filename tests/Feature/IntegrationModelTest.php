@@ -38,6 +38,15 @@ class IntegrationModelTest extends TestCase
         $this->assertSame('1234', $integration->api_key_last_four);
     }
 
+    public function test_changing_the_key_updates_the_last_four(): void
+    {
+        $integration = Integration::factory()->create(['api_key' => 'fake-key-1234']);
+
+        $integration->update(['api_key' => 'fake-key-9999']);
+
+        $this->assertSame('9999', $integration->fresh()->api_key_last_four);
+    }
+
     public function test_creating_fills_in_the_signed_in_users_company(): void
     {
         $user = User::factory()->create();
