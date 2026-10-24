@@ -5,13 +5,10 @@ namespace Database\Seeders;
 use App\Models\Company;
 use App\Models\Integration;
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
      * Seed the application's database with two companies, so you can sign in
      * as one and check that the other's pages are a 404.
