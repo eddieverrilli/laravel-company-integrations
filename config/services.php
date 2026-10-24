@@ -14,6 +14,11 @@ return [
     |
     */
 
+    // A stand-in for an ad platform's API. Integrations check a key against it before saving.
+    'ads_api' => [
+        'url' => env('ADS_API_URL', 'https://ads.example.com/api'),
+    ],
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],

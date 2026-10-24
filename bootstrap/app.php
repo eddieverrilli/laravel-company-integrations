@@ -15,6 +15,10 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // A failed validation that redirects back flashes the input to the
+        // session; keep API keys out of it.
+        $exceptions->dontFlash(['api_key']);
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
