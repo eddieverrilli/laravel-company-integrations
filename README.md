@@ -70,6 +70,7 @@ Problems the process caught while building, before review:
 - The provider tests matched `ADS_API_URL` from `.env`, so they passed in CI but failed on a machine pointed at the local fake. `phpunit.xml` now pins it.
 - The seeder used `WithoutModelEvents`, which would have skipped the hook that sets the last four, leaving seeded rows with `••••` and nothing after it.
 - After a rejected replacement key, Cancel hid the key field but left its error on screen. It was found by clicking through in a browser, and the error now sits inside the Alpine template with the field.
+- Following this README in a fresh clone left `package-lock.json` modified, because npm names the lockfile after the folder when `package.json` has no name. It has one now.
 
 ## Left out on purpose
 
