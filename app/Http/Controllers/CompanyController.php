@@ -14,6 +14,7 @@ class CompanyController extends Controller
 
         return view('companies.show', [
             'company' => $company,
+            'integrations' => $company->integrations()->orderBy('name')->get(),
             'users' => $company->users()->orderBy('name')->get(),
         ]);
     }

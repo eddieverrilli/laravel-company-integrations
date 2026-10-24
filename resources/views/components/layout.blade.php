@@ -27,6 +27,10 @@
         @endauth
 
         <main class="mx-auto max-w-3xl px-6 py-10">
+            @session('status')
+                <p role="status" class="mb-6 rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ $value }}</p>
+            @endsession
+
             {{ $slot }}
         </main>
     </body>
