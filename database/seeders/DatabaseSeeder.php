@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Company;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -11,15 +12,16 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Seed the application's database.
+     * Seed the application's database with two companies, so you can sign in
+     * as one and check that the other's pages are a 404.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $acme = Company::factory()->create(['name' => 'Acme Analytics']);
+        $globex = Company::factory()->create(['name' => 'Globex Media']);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        User::factory()->for($acme)->create(['name' => 'Ada Admin', 'email' => 'ada@acme.test']);
+        User::factory()->for($acme)->create(['name' => 'Alan Analyst', 'email' => 'alan@acme.test']);
+        User::factory()->for($globex)->create(['name' => 'Grace Admin', 'email' => 'grace@globex.test']);
     }
 }
